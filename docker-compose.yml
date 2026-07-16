@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: documind-postgres
+    environment:
+      POSTGRES_USER: documind
+      POSTGRES_PASSWORD: documind_dev # Dev-only credentials, never used in production
+      POSTGRES_DB: documind
+    ports:
+      - "5432:5432"
+    volumes:
+      - documind-pgdata:/var/lib/postgresql/data
+
+volumes:
+  documind-pgdata:
