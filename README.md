@@ -54,7 +54,7 @@ flowchart LR
 
 ## Getting started
 
-Prerequisites: .NET 10 SDK, Node.js 22+, Docker.
+Prerequisites: .NET 10 SDK, Node.js 22+, pnpm, Docker.
 
 ```bash
 # 1. Start PostgreSQL with pgvector
@@ -66,8 +66,8 @@ dotnet run
 
 # 3. Run the Angular client
 cd client
-npm install
-ng serve
+pnpm install
+pnpm start
 ```
 
 ## Roadmap
