@@ -12,4 +12,9 @@ public class Document
     public int PageCount { get; set; }
 
     public DateTime UploadedAtUtc { get; set; }
+
+    /// <summary>
+    /// The chunks of extracted text and embeddings produced when this document was ingested.
+    /// </summary>
+    public ICollection<DocumentChunk> Chunks { get; set; } = new List<DocumentChunk>();
 }
