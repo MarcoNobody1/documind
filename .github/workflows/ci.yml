@@ -21,13 +21,15 @@ jobs:
 
       - name: Restore
         run: |
-          set -o pipefail
-          dotnet restore backend/DocuMind.slnx 2>&1 | tee restore.log || true
-          code=${PIPESTATUS[0]}
-          echo '## Restore output' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          grep -iE 'error|warn|NU[0-9]+|unable|not found|no se encuentra' restore.log | head -50 >> "$GITHUB_STEP_SUMMARY" || true
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          set +e
+          dotnet restore backend/DocuMind.slnx > restore.log 2>&1
+          code=$?
+          cat restore.log
+          if [ $code -ne 0 ]; then
+            grep -iE 'error|NU[0-9]+|unable|not found|no se encuentra|does not exist' restore.log | head -15 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          fi
           exit $code
 
       - name: Build
