@@ -1,4 +1,5 @@
 using DocuMind.Application.Abstractions;
+using DocuMind.Application.Exceptions;
 using UglyToad.PdfPig;
 
 namespace DocuMind.Infrastructure.Text;
@@ -12,15 +13,23 @@ public class PdfPigTextExtractor : ITextExtractor
 {
     public Task<IReadOnlyList<PageText>> ExtractAsync(Stream content, CancellationToken cancellationToken = default)
     {
-        using var document = PdfDocument.Open(content);
-
-        var pages = new List<PageText>(document.NumberOfPages);
-        foreach (var page in document.GetPages())
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            pages.Add(new PageText(page.Number, page.Text));
-        }
+            using var document = PdfDocument.Open(content);
 
-        return Task.FromResult<IReadOnlyList<PageText>>(pages);
+            var pages = new List<PageText>(document.NumberOfPages);
+            foreach (var page in document.GetPages())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                pages.Add(new PageText(page.Number, page.Text));
+            }
+
+            return Task.FromResult<IReadOnlyList<PageText>>(pages);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidDocumentException(
+                "The uploaded file could not be parsed as a valid PDF.", ex);
+        }
     }
 }
