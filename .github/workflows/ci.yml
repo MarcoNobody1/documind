@@ -20,7 +20,15 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore backend/DocuMind.slnx
+        run: |
+          set -o pipefail
+          dotnet restore backend/DocuMind.slnx 2>&1 | tee restore.log || true
+          code=${PIPESTATUS[0]}
+          echo '## Restore output' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          grep -iE 'error|warn|NU[0-9]+|unable|not found|no se encuentra' restore.log | head -50 >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit $code
 
       - name: Build
         run: dotnet build backend/DocuMind.slnx --no-restore -c Release
