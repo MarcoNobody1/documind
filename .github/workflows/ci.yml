@@ -20,17 +20,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: |
-          set +e
-          dotnet restore backend/DocuMind.slnx > restore.log 2>&1
-          code=$?
-          cat restore.log
-          if [ $code -ne 0 ]; then
-            grep -iE 'error|NU[0-9]+|unable|not found|no se encuentra|does not exist' restore.log | head -15 | while IFS= read -r line; do
-              echo "::error::$line"
-            done
-          fi
-          exit $code
+        run: dotnet restore backend/DocuMind.slnx
 
       - name: Build
         run: dotnet build backend/DocuMind.slnx --no-restore -c Release
