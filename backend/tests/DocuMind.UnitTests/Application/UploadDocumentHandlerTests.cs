@@ -54,6 +54,26 @@ public class UploadDocumentHandlerTests
         Assert.All(repository.LastChunks!, chunk => Assert.NotNull(chunk.Embedding));
     }
 
+    [Fact]
+    public async Task HandleAsync_EmbeddingCountDoesNotMatchChunkCount_Throws()
+    {
+        var extractor = new FakeTextExtractor(
+        [
+            new PageText(1, "Some real extracted text.")
+        ]);
+        var chunker = new FakeChunker(); // returns 2 chunks
+        var embeddingGenerator = new FakeEmbeddingGenerator(forcedCount: 1); // only 1 embedding
+        var repository = new FakeChunkRepository();
+
+        var handler = new UploadDocumentHandler(extractor, chunker, embeddingGenerator, repository);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.HandleAsync("mismatch.pdf", Stream.Null));
+
+        Assert.Contains("does not match chunk count", ex.Message);
+        Assert.Null(repository.LastDocument);
+    }
+
     private sealed class FakeTextExtractor(IReadOnlyList<PageText> pages) : ITextExtractor
     {
         public Task<IReadOnlyList<PageText>> ExtractAsync(Stream content, CancellationToken cancellationToken = default)
@@ -77,7 +97,7 @@ public class UploadDocumentHandlerTests
         }
     }
 
-    private sealed class FakeEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
+    private sealed class FakeEmbeddingGenerator(int? forcedCount = null) : IEmbeddingGenerator<string, Embedding<float>>
     {
         public bool WasCalled { get; private set; }
 
@@ -87,8 +107,10 @@ public class UploadDocumentHandlerTests
             CancellationToken cancellationToken = default)
         {
             WasCalled = true;
+            var count = forcedCount ?? values.Count();
             var embeddings = new GeneratedEmbeddings<Embedding<float>>(
-                values.Select(_ => new Embedding<float>(new ReadOnlyMemory<float>([0.1f, 0.2f, 0.3f]))));
+                Enumerable.Range(0, count)
+                    .Select(_ => new Embedding<float>(new ReadOnlyMemory<float>([0.1f, 0.2f, 0.3f]))));
             return Task.FromResult(embeddings);
         }
 

@@ -60,6 +60,12 @@ public class UploadDocumentHandler
             options: null,
             cancellationToken: cancellationToken);
 
+        if (embeddings.Count != textChunks.Count)
+        {
+            throw new InvalidOperationException(
+                $"Embedding count ({embeddings.Count}) does not match chunk count ({textChunks.Count}).");
+        }
+
         var chunks = textChunks
             .Zip(embeddings, (textChunk, embedding) => new DocumentChunk
             {
