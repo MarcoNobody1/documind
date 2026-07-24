@@ -17,7 +17,14 @@ public static class DocumentsEndpoints
     {
         app.MapPost("/api/documents", UploadDocumentAsync)
             .WithName("UploadDocument")
-            .WithMetadata(new RequestSizeLimitAttribute(MaxUploadBytes));
+            .WithMetadata(new RequestSizeLimitAttribute(MaxUploadBytes))
+            // Minimal APIs attach anti-forgery metadata to any endpoint binding IFormFile, which
+            // otherwise requires app.UseAntiforgery(). CSRF protection guards against a browser
+            // replaying ambient credentials (typically a session cookie); this endpoint is
+            // unauthenticated by design for the Phase 1 MVP and is consumed cross-origin by the
+            // Angular client, so there is no session to forge and a token would add friction
+            // without adding safety. REVISIT when authentication is introduced.
+            .DisableAntiforgery();
 
         return app;
     }
