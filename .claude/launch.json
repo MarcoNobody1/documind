@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "documind-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "backend/src/DocuMind.Api",
+        "--launch-profile",
+        "http"
+      ],
+      "port": 5092
+    }
+  ]
+}
