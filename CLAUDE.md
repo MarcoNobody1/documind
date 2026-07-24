@@ -19,17 +19,42 @@ people it harms. This has already happened once in this repo in a single
 language — the setup steps documented a chat deployment that `appsettings.json`
 did not declare — and adding a second language doubles the surface.
 
-Drift check, since both files are kept structurally identical section for
-section:
+### CI enforces this
+
+The `docs` job in `.github/workflows/ci.yml` runs two checks:
+
+1. **Direction** — if `README.md` changed in the pushed range, `README.es.md`
+   must have changed too. Enforced in one direction only: English is canonical,
+   so the drift that matters is English moving ahead of its translations. A
+   Spanish-only commit is a translation fix and introduces no drift.
+2. **Structure** — both files must share the same heading shape: every section
+   present in both, at the same level, in the same order. This one runs on every
+   push regardless of what changed, because it is an invariant.
+
+Reproduce the structure check locally. Note that it strips fenced code blocks
+first: the setup sections contain shell comments that a plain `grep '^#'` counts
+as headings, which is why the naive version of this check does not work.
 
 ```bash
-diff <(grep "^##" README.md | wc -l) <(grep "^##" README.es.md | wc -l)
+headings() {
+  awk '/^```/ { f = !f; next } !f && /^#{1,6}[ \t]/ { match($0, /^#+/); print substr($0, 1, RLENGTH) }' "$1"
+}
+diff <(headings README.md) <(headings README.es.md)
 ```
 
-A mismatch in the heading count means one file has gained or lost a section.
-Matching counts are necessary but not sufficient — a changed paragraph keeps the
-count identical, so when editing prose, edit both files in the same pass rather
-than relying on the check to catch it afterwards.
+Neither check can see a reworded paragraph — prose edits keep the heading shape
+identical. So edit both files in the same pass; the checks are a backstop for
+the mistake you did not notice, not a substitute for doing it right.
+
+If an English change genuinely has no translated counterpart, add a trailer to
+the commit message rather than working around the check:
+
+```
+Docs-i18n-exempt: <reason>
+```
+
+That skips the direction check for that range. It does not skip the structure
+check, which is an invariant and has no exemption.
 
 Spanish documentation uses a neutral, professional register. No regional slang
 or voseo, regardless of the tone of the conversation that produced the change.
@@ -37,7 +62,13 @@ or voseo, regardless of the tone of the conversation that produced the change.
 When a third language is added, it follows the same pattern: `README.<lang>.md`,
 listed in the switcher on line 1 of every other README. Language switchers use
 the language name as text, never a flag emoji — a flag denotes a country, not a
-language, and text is readable by screen readers.
+language, and text is readable by screen readers. Extend the `docs` CI job to
+cover the new file at the same time, or the check silently stops guarding it.
+
+This file is intentionally English-only and outside the translation rule. It
+configures how tools and agents work in this repository rather than explaining
+the project to its readers, so there is no audience that would be misled by it
+existing in one language.
 
 ## When a change lands
 
