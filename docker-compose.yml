@@ -1,3 +1,8 @@
+# Explicit project name so every container, volume and network created here is
+# labelled `com.docker.compose.project=documind` and can be started, stopped or
+# removed as a single group, independently of any other Compose project.
+name: documind
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
