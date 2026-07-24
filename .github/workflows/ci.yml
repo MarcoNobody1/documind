@@ -27,3 +27,103 @@ jobs:
 
       - name: Test
         run: dotnet test backend/DocuMind.slnx --no-build -c Release --verbosity normal
+
+  docs:
+    name: Documentation languages in sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # Full history: the checks below diff against a base commit.
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve comparison range
+        id: range
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = 'pull_request' ]; then
+            base='${{ github.event.pull_request.base.sha }}'
+            head='${{ github.event.pull_request.head.sha }}'
+          else
+            base='${{ github.event.before }}'
+            head='${{ github.sha }}'
+          fi
+
+          # An absent or unreachable base happens on branch creation, after a
+          # force-push, and on the repository's first commit. Falling back to git's
+          # empty-tree hash treats every file as added, which keeps the check running
+          # instead of silently passing on a range it could not resolve.
+          if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "Base '$base' is not a reachable commit; comparing against the empty tree."
+            base=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+          fi
+
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "Comparing $base..$head"
+
+      - name: Require README changes to ship in every language
+        run: |
+          set -euo pipefail
+          base='${{ steps.range.outputs.base }}'
+          head='${{ steps.range.outputs.head }}'
+          empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+
+          changed=$(git diff --name-only "$base" "$head")
+          echo "Changed files:"
+          echo "$changed" | sed 's/^/  /'
+
+          # -x -F: whole line, literal. Without both, 'README.md' would also match
+          # 'client/README.md' or be read as a regex where '.' is any character.
+          en_changed=false
+          es_changed=false
+          if grep -qxF 'README.md'    <<< "$changed"; then en_changed=true; fi
+          if grep -qxF 'README.es.md' <<< "$changed"; then es_changed=true; fi
+
+          # Enforced in one direction only. English is canonical, so the drift that
+          # matters is English moving ahead of its translations. A Spanish-only commit
+          # is a translation fix and introduces no drift, so it is not flagged.
+          if [ "$en_changed" = false ]; then
+            echo "README.md unchanged in this range — nothing to enforce."
+            exit 0
+          fi
+          if [ "$es_changed" = true ]; then
+            echo "README.md and README.es.md both changed."
+            exit 0
+          fi
+
+          exempt=false
+          if [ "$base" != "$empty_tree" ] \
+            && git log --format='%B' "$base..$head" | grep -qiE '^Docs-i18n-exempt:'; then
+            exempt=true
+          fi
+
+          if [ "$exempt" = true ]; then
+            echo "::notice::README.md changed without README.es.md, allowed by a Docs-i18n-exempt: trailer."
+            exit 0
+          fi
+
+          echo "::error file=README.es.md::README.md changed but README.es.md did not. Documentation ships in every language in the same commit — a stale translation is invisible to the readers it misleads. Apply the same change to README.es.md, or add a 'Docs-i18n-exempt: <reason>' trailer to the commit message if the change genuinely has no translated counterpart."
+          exit 1
+
+      - name: Check README structure matches across languages
+        # Runs regardless of what changed: heading parity is an invariant, and a
+        # reworded paragraph or a section added to only one language can slip past a
+        # diff-range check while still leaving the files out of step.
+        run: |
+          set -euo pipefail
+
+          # Heading levels only, with fenced code blocks excluded — the setup sections
+          # contain shell comments that a naive '^#' grep counts as headings.
+          headings() {
+            awk '/^```/ { f = !f; next } !f && /^#{1,6}[ \t]/ { match($0, /^#+/); print substr($0, 1, RLENGTH) }' "$1"
+          }
+
+          if diff <(headings README.md) <(headings README.es.md); then
+            echo "Heading structure matches."
+            exit 0
+          fi
+
+          echo "::error file=README.es.md::README.md and README.es.md no longer share the same heading structure. Every section must exist in both, at the same level and in the same order."
+          exit 1
