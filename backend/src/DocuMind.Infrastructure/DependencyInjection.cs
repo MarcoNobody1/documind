@@ -27,8 +27,16 @@ public static class DependencyInjection
     {
         services.Configure<AzureOpenAIOptions>(configuration.GetSection(AzureOpenAIOptions.SectionName));
 
+        // Absent from appsettings.json on purpose: a connection string carries a password, and no
+        // credential literal belongs in tracked configuration. Local development supplies it
+        // through user-secrets, which stores it outside the working tree.
         var connectionString = configuration.GetConnectionString("Postgres")
-            ?? throw new InvalidOperationException("Missing required configuration 'ConnectionStrings:Postgres'.");
+            ?? throw new InvalidOperationException(
+                "Missing required configuration 'ConnectionStrings:Postgres'. Set it from "
+                + "backend/src/DocuMind.Api with: dotnet user-secrets set "
+                + "\"ConnectionStrings:Postgres\" \"Host=localhost;Port=5432;Database=<POSTGRES_DB>;"
+                + "Username=<POSTGRES_USER>;Password=<POSTGRES_PASSWORD>\" — using the same values "
+                + "as the .env file that Docker Compose reads. See .env.example.");
 
         services.AddDbContext<DocuMindDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()));

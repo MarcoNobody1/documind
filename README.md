@@ -61,7 +61,7 @@ flowchart LR
 - **Fixed-size chunking (~800 tokens, 15% overlap) with page metadata** — chunks carry the source page number, which is what makes exact page citations possible. Overlap protects against answers being split across chunk boundaries.
 - **Restore locked to nuget.org** — a repo-root `NuGet.config` clears inherited sources and restores only from the public nuget.org feed, so a fresh clone builds identically anywhere and can't accidentally pull an internal or typosquatted package. (The official PdfPig package id is `PdfPig`, not `UglyToad.PdfPig`.)
 - **Transitive vulnerabilities pinned at the top level** — `Microsoft.AspNetCore.OpenApi` 10.0.x declares an exact `Microsoft.OpenApi` 2.0.0 floor, and NuGet's lowest-applicable resolution then selects precisely that version, which carries a high-severity advisory (GHSA-v5pm-xwqc-g5wc). No release in the 10.0.x line raises the floor, so upgrading the parent package cannot fix it; the patched version is pinned explicitly instead, commented with the advisory id so the pin can be dropped once upstream moves. Same approach for `Microsoft.EntityFrameworkCore.Relational` and `Microsoft.Bcl.Memory`. The build is kept at zero warnings so a new advisory is visible the day it lands rather than lost in noise.
-- **Secrets via user-secrets, not tracked config** — `appsettings.json` carries only non-secret deployment topology (the model deployment names). The Azure OpenAI endpoint and API key are supplied by `dotnet user-secrets`, which stores them outside the working tree, and `.gitignore` keeps credential-shaped filenames out as a safety net rather than as the mechanism.
+- **No credential literal in tracked configuration** — `appsettings.json` carries only non-secret deployment topology (the model deployment names); the Azure OpenAI endpoint and key, and the Postgres connection string, come from `dotnet user-secrets`, which stores them outside the working tree. The Compose stack reads its Postgres credentials from an untracked `.env`, declared *without* fallback defaults on purpose: a default in `docker-compose.yml` would still be a tracked credential, so it would move the value four characters to the right and fix nothing. Missing configuration fails loudly on both halves — Compose refuses to interpolate, and the API throws at startup with the exact command to run. `.gitignore` covers credential-shaped filenames as a safety net, not as the mechanism.
 - **Hosting: Azure App Service + Neon** — managed app hosting plus serverless Postgres keeps the demo cheap to run and simple to deploy.
 
 ## Getting started
@@ -69,20 +69,27 @@ flowchart LR
 Prerequisites: .NET 10 SDK, Node.js 22+, pnpm, Docker.
 
 ```bash
-# 1. Start PostgreSQL with pgvector
+# 1. Create the local environment file. It carries the throwaway credentials for
+#    the dev Postgres container and is not tracked. Compose fails with an
+#    explicit message if it is missing.
+cp .env.example .env
+
+# 2. Start PostgreSQL with pgvector
 docker compose up -d
 
-# 2. Supply the Azure OpenAI credentials. They live in user-secrets, outside the
-#    working tree, so they are never committed. The UserSecretsId is already
-#    declared in DocuMind.Api.csproj, so there is nothing to initialise.
+# 3. Supply the API's secrets. They live in user-secrets, outside the working
+#    tree, so they are never committed. The UserSecretsId is already declared in
+#    DocuMind.Api.csproj, so there is nothing to initialise. The connection
+#    string must match the credentials in .env — see the note in .env.example.
 cd backend/src/DocuMind.Api
+dotnet user-secrets set "ConnectionStrings:Postgres" "Host=localhost;Port=5432;Database=documind;Username=documind;Password=documind_dev"
 dotnet user-secrets set "AzureOpenAI:Endpoint" "https://<your-resource>.openai.azure.com/"
 dotnet user-secrets set "AzureOpenAI:ApiKey" "<your-key>"
 
-# 3. Run the API
+# 4. Run the API
 dotnet run
 
-# 4. Run the Angular client
+# 5. Run the Angular client
 cd ../../../client
 pnpm install
 pnpm start
@@ -107,6 +114,5 @@ dotnet user-secrets set "AzureOpenAI:ChatDeployment" "<your-chat-deployment>"
 
 ### Known follow-ups
 
-- [ ] **Move the database credentials out of tracked configuration.** The Postgres user and password are currently the same literal in `docker-compose.yml` and the `appsettings.json` connection string. That is deliberate and harmless while the only database is a throwaway container on `localhost`, but it stops being harmless the moment a shared environment exists — staging, a demo stack, or CI with a persistent database. `user-secrets` is already wired for the API, so the local half has a home; the Compose half needs an `.env` file or environment variables. Do this **before** standing up the first non-localhost environment, not after.
 - [ ] **Revisit anti-forgery on `POST /api/documents`.** It is explicitly disabled because the endpoint is unauthenticated in Phase 1, so there is no ambient session for a browser to replay and a token would add friction without adding safety. Once Phase 2 introduces authentication that reasoning expires. The call site carries an inline `REVISIT` marker.
 - [ ] **Drop the `Microsoft.OpenApi` pin** once `Microsoft.AspNetCore.OpenApi` raises its dependency floor above the patched version, at which point the pin is redundant.
