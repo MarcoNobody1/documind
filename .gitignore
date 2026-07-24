@@ -23,6 +23,10 @@ secrets.json
 *.pem
 *.pfx
 
+# Agent tooling — generated output that resolves to absolute paths on the
+# machine that produced it, so it is meaningless in a clone.
+.atl/
+
 # OS
 .DS_Store
 Thumbs.db
