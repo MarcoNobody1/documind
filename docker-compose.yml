@@ -8,9 +8,16 @@ services:
     image: pgvector/pgvector:pg17
     container_name: documind-postgres
     environment:
-      POSTGRES_USER: documind
-      POSTGRES_PASSWORD: documind_dev # Dev-only credentials, never used in production
-      POSTGRES_DB: documind
+      # Supplied by the untracked .env file — copy .env.example to .env to create it.
+      #
+      # Declared without fallback defaults on purpose. A default here would still be a
+      # credential literal in tracked configuration, which is precisely what this
+      # indirection exists to avoid; it would move the value four characters to the
+      # right and fix nothing. Failing loudly on a missing .env is also easier to
+      # diagnose than a container that starts with a password nobody expected.
+      POSTGRES_USER: ${POSTGRES_USER:?missing .env — run `cp .env.example .env`}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?missing .env — run `cp .env.example .env`}
+      POSTGRES_DB: ${POSTGRES_DB:?missing .env — run `cp .env.example .env`}
     ports:
       - "5432:5432"
     volumes:
