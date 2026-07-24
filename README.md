@@ -1,3 +1,5 @@
+**English** · [Español](README.es.md)
+
 # DocuMind
 
 Chat with your documents — a RAG-powered knowledge assistant that answers questions about your PDFs with exact page citations.
