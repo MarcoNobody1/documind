@@ -15,6 +15,14 @@ dist/
 .env
 .env.local
 
+# Secrets — real credentials live in `dotnet user-secrets`, never in the repo.
+# These patterns are a safety net, not the mechanism.
+appsettings.*.local.json
+secrets.json
+*.secrets.json
+*.pem
+*.pfx
+
 # OS
 .DS_Store
 Thumbs.db
