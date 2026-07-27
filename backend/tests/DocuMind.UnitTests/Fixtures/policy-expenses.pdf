@@ -1,0 +1,48 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 590 >>
+stream
+BT
+/F1 12 Tf
+1 0 0 1 72 720 Tm
+(Acme Corp Finance Handbook - Section 12: Expense Reimbursement) Tj
+1 0 0 1 72 680 Tm
+(Business expenses must be submitted through the finance portal) Tj
+1 0 0 1 72 660 Tm
+(within 30 days of purchase, accompanied by a valid receipt.) Tj
+1 0 0 1 72 620 Tm
+(Meals during client travel are reimbursed up to 45 euros per day.) Tj
+1 0 0 1 72 600 Tm
+(Airfare must be booked in economy class unless the flight exceeds) Tj
+1 0 0 1 72 580 Tm
+(8 hours of continuous travel.) Tj
+1 0 0 1 72 540 Tm
+(Expenses without a receipt will be rejected by the finance team.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000881 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+951
+%%EOF
