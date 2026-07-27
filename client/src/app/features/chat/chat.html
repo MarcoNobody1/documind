@@ -1,0 +1,40 @@
+<section class="chat">
+  <h2>Ask a question</h2>
+
+  <div class="messages">
+    @for (message of chatService.messages(); track $index) {
+      <div class="message" [class.user]="message.role === 'user'" [class.assistant]="message.role === 'assistant'">
+        <strong>{{ message.role === 'user' ? 'You' : 'DocuMind' }}:</strong>
+        <span>{{ message.text }}</span>
+        @if (message.streaming) {
+          <span class="cursor">&#9608;</span>
+        }
+
+        @if (message.citations && message.citations.length > 0) {
+          <ul class="citations">
+            @for (citation of message.citations; track $index) {
+              <li>[{{ citation.documentName }}, p. {{ citation.pageNumber }}]</li>
+            }
+          </ul>
+        }
+      </div>
+    }
+  </div>
+
+  <form (submit)="$event.preventDefault(); ask()">
+    <input
+      type="text"
+      placeholder="Ask something about an uploaded document&hellip;"
+      [value]="question()"
+      (input)="onQuestionInput($event)"
+      [disabled]="chatService.isStreaming()"
+    />
+    <button type="submit" [disabled]="chatService.isStreaming() || !question().trim()">
+      Ask
+    </button>
+  </form>
+
+  @if (errorMessage()) {
+    <p class="warning">{{ errorMessage() }}</p>
+  }
+</section>
