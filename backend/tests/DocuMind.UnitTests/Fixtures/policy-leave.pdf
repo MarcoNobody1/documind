@@ -1,0 +1,48 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 577 >>
+stream
+BT
+/F1 12 Tf
+1 0 0 1 72 720 Tm
+(Acme Corp Policy Manual - Section 5: Parental Leave) Tj
+1 0 0 1 72 680 Tm
+(Employees expecting a child are entitled to 16 weeks of paid) Tj
+1 0 0 1 72 660 Tm
+(parental leave, which may begin up to 4 weeks before the due date.) Tj
+1 0 0 1 72 620 Tm
+(Parental leave does not reduce the annual vacation allowance and) Tj
+1 0 0 1 72 600 Tm
+(accrues normally during the absence.) Tj
+1 0 0 1 72 560 Tm
+(Employees must notify HR at least 60 days before the intended) Tj
+1 0 0 1 72 540 Tm
+(start of leave. Extensions are considered case by case.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000868 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+938
+%%EOF
