@@ -1,4 +1,5 @@
 using System.ClientModel;
+using System.ClientModel.Primitives;
 using Azure.AI.OpenAI;
 using DocuMind.Application.Abstractions;
 using DocuMind.Infrastructure.Persistence;
@@ -48,7 +49,26 @@ public static class DependencyInjection
         services.AddSingleton(sp =>
         {
             var options = sp.GetRequiredService<IOptions<AzureOpenAIOptions>>().Value;
-            return new AzureOpenAIClient(new Uri(options.Endpoint), new ApiKeyCredential(options.ApiKey));
+
+            // The Azure OpenAI TPM quota for the chat deployment was deliberately lowered to
+            // 20,000 (see the `options.ChatDeployment` / `IChatClient` registration further down
+            // in this same method), which makes 429 (rate-limited) responses expected under any
+            // real traffic burst — a public demo
+            // must retry through them rather than surface a raw error. `AzureOpenAIClientOptions`
+            // inherits `ClientPipelineOptions.RetryPolicy`, which System.ClientModel already
+            // defaults to a `ClientRetryPolicy` with exponential backoff and jitter that honours
+            // the `Retry-After` header (confirmed by inspecting the installed System.ClientModel
+            // 1.14.0 assembly: `ClientRetryPolicy.RetryAfterHeaderName` / `TryGetRetryAfter`) —
+            // but that default is set implicitly and defaults to only 3 attempts. It is
+            // constructed explicitly here, with a higher retry count, so the 429-handling
+            // behaviour is visible in this composition root rather than assumed silently, and so
+            // it is easy to tune without hunting through SDK defaults.
+            var clientOptions = new AzureOpenAIClientOptions
+            {
+                RetryPolicy = new ClientRetryPolicy(maxRetries: 5)
+            };
+
+            return new AzureOpenAIClient(new Uri(options.Endpoint), new ApiKeyCredential(options.ApiKey), clientOptions);
         });
 
         services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
@@ -56,6 +76,13 @@ public static class DependencyInjection
             var azureClient = sp.GetRequiredService<AzureOpenAIClient>();
             var options = sp.GetRequiredService<IOptions<AzureOpenAIOptions>>().Value;
             return azureClient.GetEmbeddingClient(options.EmbeddingDeployment).AsIEmbeddingGenerator();
+        });
+
+        services.AddSingleton<IChatClient>(sp =>
+        {
+            var azureClient = sp.GetRequiredService<AzureOpenAIClient>();
+            var options = sp.GetRequiredService<IOptions<AzureOpenAIOptions>>().Value;
+            return azureClient.GetChatClient(options.ChatDeployment).AsIChatClient();
         });
 
         return services;

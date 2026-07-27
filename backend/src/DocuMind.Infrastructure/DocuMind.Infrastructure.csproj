@@ -22,6 +22,10 @@
     <PackageReference Include="Pgvector" Version="0.3.2" />
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
     <PackageReference Include="PdfPig" Version="0.1.15" />
+    <!-- Explicit dependency: DependencyInjection.cs constructs a ClientRetryPolicy directly to
+         make the 429-retry behaviour visible rather than relying on the Azure SDK's implicit
+         default. Declared here rather than relying on the transitive flow from Azure.AI.OpenAI. -->
+    <PackageReference Include="System.ClientModel" Version="1.14.0" />
   </ItemGroup>
 
   <PropertyGroup>
