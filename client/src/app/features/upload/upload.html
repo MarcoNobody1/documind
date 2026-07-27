@@ -1,0 +1,19 @@
+<section class="upload">
+  <h2>Upload a document</h2>
+  <p>Add a PDF to the shared knowledge base. It becomes searchable by every question below.</p>
+
+  <input
+    type="file"
+    accept="application/pdf"
+    [disabled]="isUploading()"
+    (change)="onFileSelected($event)"
+  />
+
+  @if (isUploading()) {
+    <p>Uploading&hellip;</p>
+  }
+
+  @if (lastMessage()) {
+    <p [class.warning]="lastMessageIsWarning()">{{ lastMessage() }}</p>
+  }
+</section>

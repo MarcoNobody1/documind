@@ -16,12 +16,13 @@ La mayoría de los chatbots documentales responden con seguridad pero no pueden 
 
 ## Estado del proyecto
 
-La Fase 1 (MVP) está en curso, construida como dos rebanadas verticales:
+La Fase 1 (MVP) está terminada, construida como dos rebanadas verticales:
 
 - **Rebanada A — Ingesta (terminada, verificada en CI):** subida de PDF → extracción de texto por página (PdfPig) → troceado de tamaño fijo (~800 tokens, 15 % de solapamiento, conservando el número de página) → embeddings de Azure OpenAI vía `Microsoft.Extensions.AI` → persistencia en PostgreSQL/pgvector. Incluye la migración inicial de EF Core (extensión vector + índice HNSW), validación de la petición (PDF inválido → 400, límite de tamaño de subida, aviso de texto vacío) y pruebas unitarias.
-- **Rebanada B — Chat + UI (siguiente):** recuperación top-k entre documentos, endpoint de chat en streaming SSE con citas, y la interfaz Angular de chat y subida.
+- **Rebanada B — Chat + UI (terminada, verificada con una demo):** recuperación top-k entre documentos ordenada por distancia coseno de pgvector, un endpoint `/api/chat` en streaming SSE con citas obtenidas de los metadatos de los trozos recuperados, y una interfaz Angular mínima de subida y chat. El número de trozos recuperados (`Retrieval:TopK`, 5 por defecto) es una opción configurable y no secreta. El pipeline del cliente de Azure OpenAI recibe una política de reintento explícita (5 intentos, backoff exponencial, respeta `Retry-After`) para que una llamada de chat limitada por cuota (429) se reintente en lugar de mostrarse al usuario — la cuota del despliegue de chat es deliberadamente estrecha por control de costes, así que los 429 son un caso esperado bajo carga real, no un caso extremo.
+- **Siguiente en la Fase 1**: una rebanada de diseño dedicada para la interfaz Angular — la actual es funcional pero deliberadamente sin estilo.
 
-Una pasada de endurecimiento sobre la Rebanada A movió la configuración de Azure OpenAI detrás de `dotnet user-secrets`, dejó fijada una vulnerabilidad transitiva de severidad alta en la cadena de dependencias de OpenAPI, hizo explícita la postura anti-forgery del endpoint de subida no autenticado y dio un nombre fijo al stack de Compose. `dotnet build` y `dotnet test` están limpios: 0 avisos, 0 errores, 10/10 pruebas pasando.
+Una pasada de endurecimiento sobre la Rebanada A movió la configuración de Azure OpenAI detrás de `dotnet user-secrets`, dejó fijada una vulnerabilidad transitiva de severidad alta en la cadena de dependencias de OpenAPI, hizo explícita la postura anti-forgery del endpoint de subida no autenticado y dio un nombre fijo al stack de Compose. `dotnet build` y `dotnet test` están limpios: 0 avisos, 0 errores, 14/14 pruebas pasando.
 
 ## Arquitectura
 
@@ -63,6 +64,9 @@ flowchart LR
 - **Troceado de tamaño fijo (~800 tokens, 15 % de solapamiento) con metadatos de página** — cada trozo lleva el número de página de origen, que es lo que hace posible la cita exacta. El solapamiento protege frente a respuestas partidas entre dos trozos.
 - **Restauración limitada a nuget.org** — un `NuGet.config` en la raíz del repositorio limpia las fuentes heredadas y restaura únicamente desde el feed público de nuget.org, de modo que un clon nuevo compila igual en cualquier sitio y no puede traer por accidente un paquete interno o suplantado. (El identificador oficial de PdfPig es `PdfPig`, no `UglyToad.PdfPig`.)
 - **Vulnerabilidades transitivas fijadas en el nivel superior** — `Microsoft.AspNetCore.OpenApi` 10.0.x declara un suelo exacto de `Microsoft.OpenApi` 2.0.0, y la resolución por versión mínima aplicable de NuGet selecciona precisamente esa versión, que arrastra una vulnerabilidad de severidad alta (GHSA-v5pm-xwqc-g5wc). Ninguna versión de la línea 10.0.x eleva ese suelo, así que actualizar el paquete padre no lo arregla; en su lugar se fija explícitamente la versión parcheada, comentada con el identificador del aviso para poder retirar la fijación cuando el proveedor avance. El mismo enfoque se aplica a `Microsoft.EntityFrameworkCore.Relational` y `Microsoft.Bcl.Memory`. La compilación se mantiene con cero avisos para que un aviso nuevo se vea el día que aparezca, en lugar de perderse entre el ruido.
+- **La recuperación DEBE ordenar por distancia coseno, no por "una" distancia cualquiera** — el índice HNSW se declara con la clase de operadores `vector_cosine_ops`, y PostgreSQL solo usa un índice cuando el operador de distancia de la consulta coincide exactamente con la clase de operadores del índice. `EfChunkRepository` ordena con `CosineDistance` de `Pgvector.EntityFrameworkCore`, que se traduce al operador `<=>` (confirmado inspeccionando el SQL generado: `ORDER BY d."Embedding" <=> @queryVector`). Ordenar con `L2Distance` (`<->`) en su lugar compilaría, se ejecutaría y devolvería resultados de apariencia razonable, pero PostgreSQL recurriría en silencio a un escaneo secuencial completo en cada consulta — sin error, sin aviso, solo una consulta mucho más lenta a medida que crece la tabla. Con los volúmenes de fila pequeños de esta demo, PostgreSQL prefiere correctamente un escaneo secuencial de todos modos; ese es el comportamiento esperado del planificador, no una señal de que el índice esté roto.
+- **Los reintentos de Azure OpenAI son explícitos en la raíz de composición** — los clientes basados en `System.ClientModel` (como `AzureOpenAIClient`) ya usan por defecto una `ClientRetryPolicy` con backoff exponencial y jitter que respeta la cabecera `Retry-After`, pero ese valor por defecto es fácil de pasar por alto y se limita a 3 intentos. El `DependencyInjection` de `DocuMind.Infrastructure` construye la política de reintento de forma explícita (5 intentos) para que el comportamiento frente a 429 sea visible en el código en lugar de asumido, y fácil de ajustar. Esto importa especialmente aquí: la cuota de tokens por minuto del despliegue de chat es deliberadamente estrecha por control de costes, así que los 429 son una condición esperada bajo carga, no un caso extremo.
+- **La URL base de la API es un entorno de Angular, no una constante fija** — `ChatService` lee `environment.apiBaseUrl`. El `fileReplacements` de la configuración de compilación `development` sustituye `environment.ts` por `environment.development.ts` (`http://localhost:5092`, el puerto local de la API); el `environment.ts` por defecto que usa producción entrega `''` a propósito — una base vacía hace que cada petición se resuelva contra el propio origen de la página, lo correcto en cuanto la API es alcanzable desde el mismo origen que el cliente o a través de un proxy inverso, y no es un valor que alguien olvidó rellenar.
 - **Ninguna credencial literal en configuración versionada** — `appsettings.json` contiene solo topología de despliegue no secreta (los nombres de los despliegues de modelo); el endpoint y la clave de Azure OpenAI, así como la cadena de conexión de Postgres, provienen de `dotnet user-secrets`, que los guarda fuera del árbol de trabajo. El stack de Compose lee sus credenciales de Postgres de un `.env` no versionado, declaradas *sin* valores por defecto de forma deliberada: un valor por defecto en `docker-compose.yml` seguiría siendo una credencial versionada, así que desplazaría el valor cuatro caracteres a la derecha sin arreglar nada. La configuración ausente falla de forma ruidosa en ambas mitades: Compose se niega a interpolar y la API lanza una excepción al arrancar indicando el comando exacto a ejecutar. `.gitignore` cubre nombres de archivo con forma de credencial como red de seguridad, no como mecanismo.
 - **Alojamiento: Azure App Service + Neon** — alojamiento gestionado de la aplicación más Postgres sin servidor mantienen la demo barata de operar y sencilla de desplegar.
 
@@ -109,14 +113,25 @@ dotnet user-secrets set "AzureOpenAI:EmbeddingDeployment" "<tu-despliegue-de-emb
 dotnet user-secrets set "AzureOpenAI:ChatDeployment" "<tu-despliegue-de-chat>"
 ```
 
+El número de trozos recuperados por pregunta (`Retrieval:TopK`, 5 por defecto) también es un
+valor por defecto versionado y no secreto en `appsettings.json` — sobrescríbelo del mismo modo
+si lo necesitas:
+
+```bash
+dotnet user-secrets set "Retrieval:TopK" "8"
+```
+
 ## Hoja de ruta
 
-- [ ] **Fase 1 — MVP**: subida de PDF, canalización de troceado y embeddings (terminado), chat en streaming con citas de página exactas (siguiente).
+- [x] **Fase 1 — MVP**: subida de PDF, canalización de troceado y embeddings, chat en streaming con citas de página exactas.
 - [ ] **Fase 2 — Autenticación y colecciones**: cuentas de usuario y colecciones de documentos por usuario.
-- [ ] **Fase 3 — Calidad**: historial de conversación, reordenación de la recuperación, arnés de evaluación de respuestas.
+- [ ] **Fase 3 — Calidad**: historial de conversación, reordenación de la recuperación, arnés de evaluación de respuestas, caché semántica de respuestas.
 - [ ] **Fase 4 — Producción**: batería de pruebas más amplia, CI/CD, despliegue de una demo pública.
 
 ### Pendientes conocidos
 
 - [ ] **Revisar la protección anti-forgery en `POST /api/documents`.** Está desactivada de forma explícita porque el endpoint no está autenticado en la Fase 1, de modo que no existe una sesión ambiental que un navegador pueda reproducir y un token añadiría fricción sin añadir seguridad. En cuanto la Fase 2 introduzca autenticación, ese razonamiento caduca. El punto de llamada lleva una marca `REVISIT` en línea.
 - [ ] **Retirar la fijación de `Microsoft.OpenApi`** cuando `Microsoft.AspNetCore.OpenApi` eleve el suelo de su dependencia por encima de la versión parcheada, momento en el que la fijación pasa a ser redundante.
+- [ ] **Pasada de diseño sobre la interfaz Angular.** Los componentes de subida y chat son deliberadamente mínimos y sin estilo — funcionales para la demo, no representativos del diseño de producto previsto. Pendiente de que se planifique una rebanada de diseño dedicada.
+- [ ] **Caché semántica de respuestas.** Diferida deliberadamente fuera de la Rebanada B — necesita una tabla nueva y una ruta de búsqueda propia, lo que habría mezclado una preocupación no relacionada en la implementación del chat. Pendiente en cuanto la latencia o el coste de preguntas repetidas se convierta en un problema medido que merezca la pena resolver.
+- [ ] **Prueba de integración de ida y vuelta con pgvector** (`WebApplicationFactory` + una Postgres real o con Testcontainers, según la estrategia de pruebas del diseño). La cobertura actual es de nivel unitario (repositorios/extractores simulados) más una demo manual de extremo a extremo; una prueba real de ida y vuelta es pendiente en cuanto cambie la ruta de recuperación o se añada una segunda estrategia de recuperación, para detectar una regresión ahí antes de la siguiente demo manual, no gracias a ella.
