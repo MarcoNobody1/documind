@@ -133,5 +133,8 @@ public class UploadDocumentHandlerTests
             LastChunks = chunks;
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<RetrievedChunk>> SearchAsync(ReadOnlyMemory<float> queryEmbedding, int k, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<RetrievedChunk>>([]);
     }
 }
