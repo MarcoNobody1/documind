@@ -121,6 +121,35 @@ si lo necesitas:
 dotnet user-secrets set "Retrieval:TopK" "8"
 ```
 
+## Ramas y versionado
+
+| Rama | Función |
+| --- | --- |
+| `main` | Siempre publicable. Protegida: sin subidas directas, los cambios entran por pull request con la CI en verde. |
+| `production` | Lo que está desplegado. Se avanza por fast-forward desde `main` al publicar; nunca se commitea directamente sobre ella. |
+| `feature/*`, `fix/*`, `chore/*`, `docs/*` | De vida corta, una unidad de trabajo cada una, se eliminan tras la fusión. |
+
+Los commits siguen [Conventional Commits](https://www.conventionalcommits.org/). Eso es lo que
+permite construir el registro de cambios a partir del historial en lugar de mantenerlo a mano, y
+por eso el tipo de commit no es decorativo.
+
+Las publicaciones son [versiones semánticas](https://semver.org/) etiquetadas en `main` como
+`vMAYOR.MENOR.PARCHE`, registradas en [CHANGELOG.md](CHANGELOG.md) y promovidas por fast-forward,
+de modo que `production` nunca puede contener un commit que `main` no haya visto:
+
+```bash
+git switch production && git merge --ff-only main && git push origin production
+```
+
+Antes de la 1.0, la versión menor marca una fase completada y la de parche marca correcciones
+dentro de ella.
+
+**Por qué no Git Flow.** Su estructura de `develop`/`release`/`hotfix` existe para mantener
+varias versiones publicadas en paralelo. Este proyecto entrega una única versión de forma
+continua, así que esas ramas añadirían ceremonia sin responder a ninguna pregunta que el proyecto
+tenga realmente — algo que su propio autor ha señalado después para el software de entrega
+continua.
+
 ## Hoja de ruta
 
 - [x] **Fase 1 — MVP**: subida de PDF, canalización de troceado y embeddings, chat en streaming con citas de página exactas.

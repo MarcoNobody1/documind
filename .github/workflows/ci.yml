@@ -28,6 +28,40 @@ jobs:
       - name: Test
         run: dotnet test backend/DocuMind.slnx --no-build -c Release --verbosity normal
 
+  client:
+    name: Client build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        # No version pinned here on purpose: the action reads the `packageManager`
+        # field from client/package.json, so CI and local development cannot drift.
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: Install
+        # --frozen-lockfile fails rather than silently resolving a different tree
+        # when the lockfile and package.json disagree.
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        # Vitest detects CI and runs once instead of watching.
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
   docs:
     name: Documentation languages in sync
     runs-on: ubuntu-latest
