@@ -40,8 +40,15 @@ jobs:
 
       - name: Setup pnpm
         # No version pinned here on purpose: the action reads the `packageManager`
-        # field from client/package.json, so CI and local development cannot drift.
+        # field, so CI and local development cannot drift.
+        #
+        # package_json_file is required because the action defaults to the
+        # repository root, and this repository has no package.json there — the
+        # Angular workspace lives in client/. The `defaults.working-directory`
+        # above does not help: it applies to `run` steps, not to actions.
         uses: pnpm/action-setup@v4
+        with:
+          package_json_file: client/package.json
 
       - name: Setup Node
         uses: actions/setup-node@v4
