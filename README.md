@@ -118,6 +118,33 @@ checked-in, non-secret default in `appsettings.json` — override it the same wa
 dotnet user-secrets set "Retrieval:TopK" "8"
 ```
 
+## Branching and releases
+
+| Branch | Role |
+| --- | --- |
+| `main` | Always releasable. Protected: no direct pushes, changes arrive by pull request with CI green. |
+| `production` | What is deployed. Fast-forwarded from `main` at release time, never committed to directly. |
+| `feature/*`, `fix/*`, `chore/*`, `docs/*` | Short-lived, one work unit each, deleted after merge. |
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/). That is what lets
+the changelog be assembled from history instead of maintained by hand, and it is why the commit
+type is not decoration.
+
+Releases are [semantic versions](https://semver.org/) tagged on `main` as `vMAJOR.MINOR.PATCH`,
+recorded in [CHANGELOG.md](CHANGELOG.md), and promoted by fast-forward so `production` can never
+contain a commit that `main` has not seen:
+
+```bash
+git switch production && git merge --ff-only main && git push origin production
+```
+
+Before 1.0 the minor version marks a completed phase and the patch version marks fixes within it.
+
+**Why not Git Flow.** Its `develop`/`release`/`hotfix` layering exists to maintain several
+released versions in parallel. This project ships a single version continuously, so those
+branches would add ceremony without answering a question the project actually has — a point its
+own author has since made about continuously delivered software.
+
 ## Roadmap
 
 - [x] **Phase 1 — MVP**: PDF upload, chunking + embedding pipeline, streaming chat with exact page citations.
