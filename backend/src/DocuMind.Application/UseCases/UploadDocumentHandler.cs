@@ -33,14 +33,18 @@ public class UploadDocumentHandler
         _chunkRepository = chunkRepository;
     }
 
-    public async Task<UploadResult> HandleAsync(string fileName, Stream content, CancellationToken cancellationToken = default)
+    public async Task<UploadResult> HandleAsync(Guid ownerId, string fileName, Stream content, CancellationToken cancellationToken = default)
     {
         var pages = await _textExtractor.ExtractAsync(content, cancellationToken);
         var pageCount = pages.Count;
 
+        // OwnerId comes only from the authenticated principal the composition root already
+        // resolved (see ClaimsPrincipalExtensions.GetOwnerId) — never from anything in the request
+        // body, so a caller cannot claim a document on someone else's behalf.
         var document = new Document
         {
             Id = Guid.NewGuid(),
+            OwnerId = ownerId,
             FileName = fileName,
             PageCount = pageCount,
             UploadedAtUtc = DateTime.UtcNow
@@ -71,6 +75,10 @@ public class UploadDocumentHandler
             {
                 Id = Guid.NewGuid(),
                 DocumentId = document.Id,
+                // Stamped in the same write as Document.OwnerId (ADR-H): the chunk's copy is
+                // derived, never independently sourced, so the two can never disagree here — the
+                // composite FK in the database is what actually enforces that invariant.
+                OwnerId = ownerId,
                 PageNumber = textChunk.PageNumber,
                 Ordinal = textChunk.Ordinal,
                 Content = textChunk.Content,
