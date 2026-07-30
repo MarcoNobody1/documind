@@ -1,13 +1,17 @@
 using DocuMind.Domain.Entities;
+using DocuMind.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 
 namespace DocuMind.Infrastructure.Persistence;
 
 /// <summary>
-/// EF Core database context for the DocuMind shared document store, backed by PostgreSQL + pgvector.
+/// EF Core database context for the DocuMind shared document store, backed by PostgreSQL +
+/// pgvector, and for ASP.NET Core Identity's <c>AspNet*</c> tables (users only — no roles, no
+/// claims/tokens stores beyond what Identity's own model needs).
 /// </summary>
-public class DocuMindDbContext : DbContext
+public class DocuMindDbContext : IdentityUserContext<ApplicationUser, Guid>
 {
     /// <summary>
     /// Embedding vector dimensionality, matching the configured Azure OpenAI embedding deployment
@@ -26,6 +30,13 @@ public class DocuMindDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // IdentityUserContext's own conventions (AspNetUsers and its indexes) must be applied
+        // FIRST, before the documents/document_chunks overrides below. Calling this last (as the
+        // pre-Identity version of this method did) would let Identity's conventions run after —
+        // and, more importantly, is the wrong order to reason about once both configurations share
+        // one model. Kept first for that reason, not because of an observed conflict.
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.HasPostgresExtension("vector");
 
         modelBuilder.Entity<Document>(entity =>
@@ -50,7 +61,5 @@ public class DocuMindDbContext : DbContext
                 .HasMethod("hnsw")
                 .HasOperators("vector_cosine_ops");
         });
-
-        base.OnModelCreating(modelBuilder);
     }
 }
