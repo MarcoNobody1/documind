@@ -12,6 +12,63 @@ explains the project to a newcomer.
 
 ## [Unreleased]
 
+Phase 2 — authentication and per-user documents. **This phase is a breaking change for any
+existing deployment**: documents are no longer a shared collection, and the migration that
+introduces ownership deletes all existing documents and chunks rather than guessing an owner for
+them (see Removed).
+
+### Added
+
+- **User accounts.** `POST /api/account/register`, `POST /api/account/login`,
+  `POST /api/account/logout`, and `GET /api/account/me`, built on ASP.NET Core Identity's
+  `UserManager`/`SignInManager` rather than `MapIdentityApi`, which defaults to bearer tokens —
+  the wrong transport for a browser SPA.
+- **Cookie authentication with CSRF protection.** Session state lives in an `HttpOnly` cookie,
+  which cross-site script injection cannot read, and the CSRF exposure that choice creates is
+  answered with antiforgery tokens rather than left implicit. Authentication failures return
+  `401`/`403` instead of redirecting to an HTML login page, because an API must never redirect a
+  `fetch` caller.
+- **Per-user document ownership.** Every document and chunk carries an owner. Retrieval, listing,
+  and chat are scoped to the authenticated caller, and the isolation is enforced by the database
+  schema — a composite foreign key makes a chunk whose owner disagrees with its document's owner
+  impossible to insert — rather than by remembering to add a `WHERE` clause on every write path.
+- **Client authentication surface.** `/login` and `/register` routes with a guarded application
+  root, and a bootstrap call that resolves the session once per app load before the guard decides
+  anything.
+- **Owner-isolation integration test.** Runs against a real pgvector instance via Testcontainers,
+  seeds three users with roughly five thousand chunks each, and asserts both that results belong
+  exclusively to the querying owner and that PostgreSQL chose the HNSW index scan. Isolation is a
+  security property, so it is verified on every commit rather than demonstrated once by hand.
+
+### Changed
+
+- **`dotnet test` now requires Docker.** The owner-isolation test starts its own disposable
+  Postgres container. CI needed no change; `ubuntu-latest` already ships Docker.
+- **The Postgres connection string must carry `Options=-c hnsw.iterative_scan=strict_order`.**
+  Owner-filtered vector search needs it: without iterative scans, pgvector applies the filter
+  after the ordered index scan and can return fewer results than requested with no error at all.
+  The application asserts this at startup and refuses to boot if it is missing, because a silent
+  under-return is worse than a failure to start.
+
+### Removed
+
+- **All pre-existing documents and chunks.** The migration that adds the non-nullable owner
+  columns deletes them in the same step. There is no correct owner to assign to a document
+  uploaded before ownership existed, and inventing one would be worse than requiring a re-upload.
+  This cannot be undone by rolling the migration back.
+
+### Security
+
+- **Anti-forgery is now enforced on `POST /api/documents`.** The `REVISIT` marker from 0.1.0 is
+  resolved: the endpoint is authenticated, so there is now an ambient session a cross-origin form
+  could replay, and the token requirement is real protection rather than friction. `POST /api/chat`
+  deliberately carries no such filter — it accepts only JSON, which a cross-origin HTML form cannot
+  send. Both halves of that asymmetry are asserted by tests that read the endpoints' metadata, so
+  switching either one off fails the build instead of passing silently.
+- **Documents are isolated per user at the schema level.** Deleting an account cannot silently
+  destroy documents: the owner foreign key is `ON DELETE RESTRICT` until an explicit
+  account-deletion flow decides what should happen.
+
 ## [0.1.0] — 2026-07-28
 
 First functional release. The complete "chat over your own documents" path works end to end
