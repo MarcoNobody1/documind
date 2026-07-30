@@ -10,7 +10,9 @@ namespace DocuMind.Api.Endpoints;
 /// <summary>
 /// Endpoints for document upload, ingestion, and listing. Both require authentication (Phase 2,
 /// PR4): every document belongs to exactly one owner, derived only from the authenticated
-/// principal.
+/// principal. The upload endpoint additionally enforces antiforgery validation (Phase 2, PR5) —
+/// see the comment at its map site for why that requires no code, and ADR-C in README.md for why
+/// <c>/api/chat</c> deliberately does not.
 /// </summary>
 public static class DocumentsEndpoints
 {
@@ -19,19 +21,22 @@ public static class DocumentsEndpoints
 
     public static IEndpointRouteBuilder MapDocumentsEndpoints(this IEndpointRouteBuilder app)
     {
+        // Antiforgery validation is ENFORCED here, and the *absence* of a .DisableAntiforgery()
+        // call is the entire mechanism: minimal APIs attach antiforgery metadata automatically to
+        // any endpoint that binds IFormFile, so this endpoint demands a valid token by default and
+        // the only way to weaken it is to add a call back. Nothing here needs to opt in.
+        //
+        // That the sibling /api/chat endpoint gets no such filter is not an oversight but ADR-C's
+        // deliberate asymmetry: a cross-origin HTML form can forge a multipart POST, and cannot
+        // send application/json.
+        //
+        // This is asserted rather than asserted-in-prose. EndpointSecurityMetadataTests reads the
+        // built endpoint's metadata and fails if antiforgery validation is ever switched off here
+        // again, because a comment cannot fail a build.
         app.MapPost("/api/documents", UploadDocumentAsync)
             .WithName("UploadDocument")
             .WithMetadata(new RequestSizeLimitAttribute(MaxUploadBytes))
-            .RequireAuthorization()
-            // Minimal APIs attach anti-forgery metadata to any endpoint binding IFormFile, which
-            // otherwise requires app.UseAntiforgery(). This endpoint is now authenticated
-            // (RequireAuthorization above), so there IS an ambient session cookie a browser could
-            // replay — the reasoning that justified disabling antiforgery no longer holds.
-            // Removing this call is deliberately deferred to PR5, alongside the Angular-absolute-
-            // URL fix (ADR-J) that removing it depends on; see ADR-C/ADR-D and the REVISIT marker
-            // this comment replaces. Do not read this as the antiforgery decision being settled —
-            // it is explicitly revisited in the very next PR.
-            .DisableAntiforgery();
+            .RequireAuthorization();
 
         app.MapGet("/api/documents", ListDocumentsAsync)
             .WithName("ListDocuments")
