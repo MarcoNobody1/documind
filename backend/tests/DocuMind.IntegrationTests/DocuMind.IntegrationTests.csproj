@@ -20,6 +20,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Needed by AccountIdentityBehaviourTests: SignInManager, IdentityConstants,
+         AddAuthentication and IHttpContextAccessor live in the ASP.NET Core shared framework, not
+         in the Identity packages Infrastructure already brings in transitively (those supply
+         UserManager and the EF stores only). A FrameworkReference rather than a ProjectReference to
+         DocuMind.Api: the tests need those framework types, not the application's composition root,
+         and pulling the whole app in would make it far too easy to start testing through it by
+         accident. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\DocuMind.Application\DocuMind.Application.csproj" />
     <ProjectReference Include="..\..\src\DocuMind.Domain\DocuMind.Domain.csproj" />
     <ProjectReference Include="..\..\src\DocuMind.Infrastructure\DocuMind.Infrastructure.csproj" />
