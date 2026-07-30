@@ -1,6 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 
+import { AuthService } from './auth.service';
 import { ChatService, parseSseStream } from './chat.service';
 
 /** Builds a `ReadableStream<Uint8Array>` from a plain string, chunked to simulate network arrival. */
@@ -74,8 +76,12 @@ describe('parseSseStream', () => {
 });
 
 describe('ChatService.ask', () => {
+  afterEach(() => {
+    document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  });
+
   it('accumulates streamed tokens into the assistant message and attaches citations at the end', async () => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter([])] });
     const service = TestBed.inject(ChatService);
 
     const sse =
@@ -100,5 +106,61 @@ describe('ChatService.ask', () => {
     expect(messages[1].text).toBe('The answer.');
     expect(messages[1].streaming).toBe(false);
     expect(messages[1].citations).toEqual([{ documentName: 'handbook.pdf', pageNumber: 3 }]);
+  });
+
+  it('sends credentials and an X-XSRF-TOKEN header read from the cookie', async () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter([])] });
+    const service = TestBed.inject(ChatService);
+
+    document.cookie = 'XSRF-TOKEN=tok123';
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(streamFrom('data: hi\n\n'), {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await service.ask('Hi');
+
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(options.credentials).toBe('include');
+    expect((options.headers as Record<string, string>)['X-XSRF-TOKEN']).toBe('tok123');
+  });
+
+  it('omits the X-XSRF-TOKEN header entirely when no token cookie exists yet', async () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter([])] });
+    const service = TestBed.inject(ChatService);
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(streamFrom('data: hi\n\n'), {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await service.ask('Hi');
+
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect('X-XSRF-TOKEN' in (options.headers as Record<string, string>)).toBe(false);
+  });
+
+  it('on a 401 to the initial request, surfaces a visible message, redirects to /login, and does not throw', async () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter([])] });
+    const service = TestBed.inject(ChatService);
+    const authService = TestBed.inject(AuthService);
+    const redirectSpy = vi.spyOn(authService, 'redirectToLogin').mockImplementation(() => {});
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+
+    await expect(service.ask('Anything?')).resolves.toBeUndefined();
+
+    const messages = service.messages();
+    expect(messages[1].text).toContain('session has expired');
+    expect(messages[1].streaming).toBe(false);
+    expect(redirectSpy).toHaveBeenCalledOnce();
+    expect(service.isStreaming()).toBe(false);
   });
 });
