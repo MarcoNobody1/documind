@@ -21,7 +21,7 @@ public class UploadDocumentHandlerTests
 
         var handler = new UploadDocumentHandler(extractor, chunker, embeddingGenerator, repository);
 
-        var result = await handler.HandleAsync("scanned.pdf", Stream.Null);
+        var result = await handler.HandleAsync(Guid.NewGuid(), "scanned.pdf", Stream.Null);
 
         Assert.NotNull(result.Warning);
         Assert.Equal(0, result.ChunkCount);
@@ -44,14 +44,17 @@ public class UploadDocumentHandlerTests
         var repository = new FakeChunkRepository();
 
         var handler = new UploadDocumentHandler(extractor, chunker, embeddingGenerator, repository);
+        var ownerId = Guid.NewGuid();
 
-        var result = await handler.HandleAsync("handbook.pdf", Stream.Null);
+        var result = await handler.HandleAsync(ownerId, "handbook.pdf", Stream.Null);
 
         Assert.Null(result.Warning);
         Assert.Equal(chunker.ChunksToReturn.Count, result.ChunkCount);
         Assert.NotNull(repository.LastChunks);
         Assert.Equal(chunker.ChunksToReturn.Count, repository.LastChunks!.Count);
         Assert.All(repository.LastChunks!, chunk => Assert.NotNull(chunk.Embedding));
+        Assert.Equal(ownerId, repository.LastDocument!.OwnerId);
+        Assert.All(repository.LastChunks!, chunk => Assert.Equal(ownerId, chunk.OwnerId));
     }
 
     [Fact]
@@ -68,7 +71,7 @@ public class UploadDocumentHandlerTests
         var handler = new UploadDocumentHandler(extractor, chunker, embeddingGenerator, repository);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => handler.HandleAsync("mismatch.pdf", Stream.Null));
+            () => handler.HandleAsync(Guid.NewGuid(), "mismatch.pdf", Stream.Null));
 
         Assert.Contains("does not match chunk count", ex.Message);
         Assert.Null(repository.LastDocument);
@@ -134,7 +137,10 @@ public class UploadDocumentHandlerTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<RetrievedChunk>> SearchAsync(ReadOnlyMemory<float> queryEmbedding, int k, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<RetrievedChunk>> SearchAsync(Guid ownerId, ReadOnlyMemory<float> queryEmbedding, int k, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<RetrievedChunk>>([]);
+
+        public Task<IReadOnlyList<DocumentSummary>> ListDocumentsAsync(Guid ownerId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("Not used by UploadDocumentHandler.");
     }
 }

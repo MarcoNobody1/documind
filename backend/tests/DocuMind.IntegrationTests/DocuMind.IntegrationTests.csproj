@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -8,8 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.7.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
@@ -19,18 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DocuMind.Api\DocuMind.Api.csproj" />
     <ProjectReference Include="..\..\src\DocuMind.Application\DocuMind.Application.csproj" />
     <ProjectReference Include="..\..\src\DocuMind.Domain\DocuMind.Domain.csproj" />
     <ProjectReference Include="..\..\src\DocuMind.Infrastructure\DocuMind.Infrastructure.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Real fictional PDFs used by PdfPigTextExtractor tests (and originally by the Slice A/B
-         manual E2E passes) — promoted from a throwaway scratch directory into the repo so the
-         extraction tests exercise a real PDF parser against real file bytes, not a hand-built
-         fake. Copied to the test output directory so tests can open them by relative path. -->
-    <None Include="Fixtures\*.pdf" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

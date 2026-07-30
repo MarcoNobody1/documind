@@ -18,7 +18,7 @@ public class AskQuestionHandlerTests
 
         var handler = new AskQuestionHandler(repository, embeddingGenerator, chatClient, topK: 5);
 
-        await handler.HandleAsync("How many vacation days do I get?");
+        await handler.HandleAsync(Guid.NewGuid(), "How many vacation days do I get?");
 
         Assert.Equal(5, repository.LastK);
     }
@@ -37,7 +37,7 @@ public class AskQuestionHandlerTests
 
         var handler = new AskQuestionHandler(repository, embeddingGenerator, chatClient, topK: 5);
 
-        var answer = await handler.HandleAsync("cross-document question");
+        var answer = await handler.HandleAsync(Guid.NewGuid(), "cross-document question");
 
         Assert.Equal(2, answer.Citations.Count);
         Assert.Contains(answer.Citations, c => c.DocumentName == "handbook.pdf" && c.PageNumber == 3);
@@ -53,7 +53,7 @@ public class AskQuestionHandlerTests
 
         var handler = new AskQuestionHandler(repository, embeddingGenerator, chatClient, topK: 5);
 
-        var answer = await handler.HandleAsync("question");
+        var answer = await handler.HandleAsync(Guid.NewGuid(), "question");
 
         var tokens = new List<string>();
         await foreach (var token in answer.Tokens)
@@ -74,18 +74,39 @@ public class AskQuestionHandlerTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new AskQuestionHandler(repository, embeddingGenerator, chatClient, topK: 0));
     }
 
+    [Fact]
+    public async Task HandleAsync_PassesOwnerIdToRepository()
+    {
+        var repository = new FakeChunkRepository([]);
+        var embeddingGenerator = new FakeEmbeddingGenerator();
+        var chatClient = new FakeChatClient(["answer"]);
+        var ownerId = Guid.NewGuid();
+
+        var handler = new AskQuestionHandler(repository, embeddingGenerator, chatClient, topK: 5);
+
+        await handler.HandleAsync(ownerId, "question");
+
+        Assert.Equal(ownerId, repository.LastOwnerId);
+    }
+
     private sealed class FakeChunkRepository(IReadOnlyList<RetrievedChunk> chunksToReturn) : IChunkRepository
     {
         public int? LastK { get; private set; }
 
+        public Guid? LastOwnerId { get; private set; }
+
         public Task AddDocumentAsync(DocuMind.Domain.Entities.Document document, IReadOnlyList<DocuMind.Domain.Entities.DocumentChunk> chunks, CancellationToken cancellationToken = default)
             => throw new NotSupportedException("Not used by AskQuestionHandler.");
 
-        public Task<IReadOnlyList<RetrievedChunk>> SearchAsync(ReadOnlyMemory<float> queryEmbedding, int k, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<RetrievedChunk>> SearchAsync(Guid ownerId, ReadOnlyMemory<float> queryEmbedding, int k, CancellationToken cancellationToken = default)
         {
+            LastOwnerId = ownerId;
             LastK = k;
             return Task.FromResult(chunksToReturn);
         }
+
+        public Task<IReadOnlyList<DocumentSummary>> ListDocumentsAsync(Guid ownerId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("Not used by AskQuestionHandler.");
     }
 
     private sealed class FakeEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
