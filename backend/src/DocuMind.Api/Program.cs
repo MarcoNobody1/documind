@@ -91,6 +91,18 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Run once, after Build() and before Run(): placing it in AddInfrastructure would break that
+// method's documented invariant that DI registration never contacts the database, and placing it
+// before Build() would let EF's design-time tooling (dotnet ef database update) execute it against
+// a schema that may not exist yet — HostFactoryResolver intercepts at Build() and aborts before
+// reaching here. Throws on failure (ADR-I): a retrieval path that is silently unscoped is worse
+// than an API that refuses to start.
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<DocuMindDbContext>();
+    await RetrievalPrerequisiteCheck.VerifyAsync(dbContext);
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {

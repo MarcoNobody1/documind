@@ -1,6 +1,8 @@
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
+using System.Security.Claims;
 using System.Text.Json;
+using DocuMind.Api.Extensions;
 using DocuMind.Application.UseCases;
 using DocuMind.Domain.ValueObjects;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -8,15 +10,18 @@ using Microsoft.AspNetCore.Http.HttpResults;
 namespace DocuMind.Api.Endpoints;
 
 /// <summary>
-/// Endpoint for retrieval-augmented chat (Slice B). No authentication is required per the Phase 1
-/// MVP boundary — questions are answered against the single shared document store.
+/// Endpoint for retrieval-augmented chat. Requires authentication (Phase 2, PR4): retrieval is
+/// scoped to the caller's own documents only (ADR-C: no antiforgery filter here — see the
+/// deliberate CSRF asymmetry recorded in README.md; protection instead rests on the JSON
+/// content-type forcing a CORS preflight, a non-wildcard CORS origin, and SameSite cookie scoping).
 /// </summary>
 public static class ChatEndpoints
 {
     public static IEndpointRouteBuilder MapChatEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/chat", AskQuestionAsync)
-            .WithName("AskQuestion");
+            .WithName("AskQuestion")
+            .RequireAuthorization();
 
         return app;
     }
@@ -24,17 +29,20 @@ public static class ChatEndpoints
     private static ServerSentEventsResult<string> AskQuestionAsync(
         ChatRequest request,
         AskQuestionHandler handler,
+        ClaimsPrincipal principal,
         CancellationToken cancellationToken)
     {
-        return TypedResults.ServerSentEvents(StreamAsync(request, handler, cancellationToken));
+        var ownerId = principal.GetOwnerId();
+        return TypedResults.ServerSentEvents(StreamAsync(ownerId, request, handler, cancellationToken));
     }
 
     private static async IAsyncEnumerable<SseItem<string>> StreamAsync(
+        Guid ownerId,
         ChatRequest request,
         AskQuestionHandler handler,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var answer = await handler.HandleAsync(request.Question, cancellationToken);
+        var answer = await handler.HandleAsync(ownerId, request.Question, cancellationToken);
 
         await foreach (var token in answer.Tokens.WithCancellation(cancellationToken))
         {
@@ -56,5 +64,5 @@ public static class ChatEndpoints
 }
 
 /// <summary>API request for a chat question. Single-turn by design — no conversation history.</summary>
-/// <param name="Question">The user's question, answered against the shared document store.</param>
+/// <param name="Question">The user's question, answered against the caller's own documents only.</param>
 public record ChatRequest(string Question);
