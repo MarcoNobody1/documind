@@ -30,7 +30,7 @@ public class EfChunkRepository : IChunkRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<RetrievedChunk>> SearchAsync(ReadOnlyMemory<float> queryEmbedding, int k, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<RetrievedChunk>> SearchAsync(Guid ownerId, ReadOnlyMemory<float> queryEmbedding, int k, CancellationToken cancellationToken = default)
     {
         var queryVector = new Vector(queryEmbedding);
 
@@ -48,7 +48,16 @@ public class EfChunkRepository : IChunkRepository
         // that carries the already-computed distance through the `Join`, which makes this query
         // materially less readable for an unmeasurable gain at this scale. Revisit only if
         // profiling ever shows this query as a real cost, not preemptively.
+        //
+        // The `Where(c => c.OwnerId == ownerId)` filters `document_chunks` itself — the same
+        // relation the HNSW index lives on — rather than joining to `documents` and filtering
+        // there (ADR-H). This keeps the owner predicate single-table, which is the shape
+        // pgvector's iterative scan (asserted at startup by RetrievalPrerequisiteCheck, ADR-I) is
+        // documented to handle: without it, the filter can silently return fewer than `k` rows
+        // once enough of another owner's chunks rank ahead of the caller's — the exact security
+        // property under test in DocuMind.IntegrationTests.OwnerIsolationTests.
         return await _dbContext.DocumentChunks
+            .Where(chunk => chunk.OwnerId == ownerId)
             .OrderBy(chunk => chunk.Embedding.CosineDistance(queryVector))
             .Take(k)
             .Join(
@@ -61,6 +70,17 @@ public class EfChunkRepository : IChunkRepository
                     chunk.PageNumber,
                     chunk.Content,
                     chunk.Embedding.CosineDistance(queryVector)))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DocumentSummary>> ListDocumentsAsync(Guid ownerId, CancellationToken cancellationToken = default)
+    {
+        // OwnerId is intentionally excluded from the projection: this feeds GET /api/documents
+        // directly, and that endpoint's contract is that ownership never appears in the response
+        // body.
+        return await _dbContext.Documents
+            .Where(document => document.OwnerId == ownerId)
+            .Select(document => new DocumentSummary(document.Id, document.FileName, document.PageCount, document.UploadedAtUtc))
             .ToListAsync(cancellationToken);
     }
 }

@@ -31,13 +31,28 @@ public static class DependencyInjection
         // Absent from appsettings.json on purpose: a connection string carries a password, and no
         // credential literal belongs in tracked configuration. Local development supplies it
         // through user-secrets, which stores it outside the working tree.
+        //
+        // As of Phase 2 PR4, this connection string MUST also carry
+        // `Options=-c hnsw.iterative_scan=strict_order` (e.g. appended with `;Options=-c
+        // hnsw.iterative_scan=strict_order`) — ADR-I. Owner-scoped retrieval (EfChunkRepository.
+        // SearchAsync) filters `document_chunks` before the HNSW ORDER BY/LIMIT; without iterative
+        // scan enabled for the physical connection, PostgreSQL's post-scan filtering can silently
+        // return fewer than the requested `k` rows once enough of another owner's chunks rank
+        // ahead of the caller's, instead of continuing the scan. RetrievalPrerequisiteCheck (run
+        // once at startup, after app.Build()) throws if this setting is missing or if the
+        // installed `vector` extension predates 0.8.0 (the version iterative scans shipped in) —
+        // so an omitted fragment fails loudly at startup rather than as a silent under-return at
+        // query time. `Options=-c ...` is passed in Npgsql's startup packet and therefore becomes
+        // that physical connection's session default, which survives pool `RESET`/`DISCARD ALL`.
         var connectionString = configuration.GetConnectionString("Postgres")
             ?? throw new InvalidOperationException(
                 "Missing required configuration 'ConnectionStrings:Postgres'. Set it from "
                 + "backend/src/DocuMind.Api with: dotnet user-secrets set "
                 + "\"ConnectionStrings:Postgres\" \"Host=localhost;Port=5432;Database=<POSTGRES_DB>;"
-                + "Username=<POSTGRES_USER>;Password=<POSTGRES_PASSWORD>\" — using the same values "
-                + "as the .env file that Docker Compose reads. See .env.example.");
+                + "Username=<POSTGRES_USER>;Password=<POSTGRES_PASSWORD>;Options=-c "
+                + "hnsw.iterative_scan=strict_order\" — using the same Host/Port/Database/Username/"
+                + "Password as the .env file that Docker Compose reads (see .env.example), plus the "
+                + "required Options fragment (ADR-I).");
 
         services.AddDbContext<DocuMindDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()));
