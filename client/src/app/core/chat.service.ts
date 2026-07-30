@@ -3,7 +3,9 @@ import { Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { environment } from '../../environments/environment';
+import { AuthService } from './auth.service';
 import { ChatMessage, Citation, UploadDocumentResponse } from './models';
+import { readXsrfToken } from './xsrf';
 
 /**
  * Uploads PDFs and asks questions against the shared document store, and holds the
@@ -15,7 +17,10 @@ export class ChatService {
   readonly messages = signal<ChatMessage[]>([]);
   readonly isStreaming = signal(false);
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(
+    private readonly http: HttpClient,
+    private readonly authService: AuthService
+  ) {}
 
   async uploadDocument(file: File): Promise<UploadDocumentResponse> {
     const formData = new FormData();
@@ -44,11 +49,39 @@ export class ChatService {
     this.isStreaming.set(true);
 
     try {
+      // `fetch` bypasses every Angular interceptor, so credentials and the antiforgery header
+      // are attached manually here rather than relying on api.interceptor.ts (which only sees
+      // HttpClient requests, e.g. uploadDocument above). `credentials: 'include'` is required —
+      // its default, 'same-origin', would silently drop the auth cookie in the :4200→:5092 dev
+      // topology. The XSRF header is sent even though ADR-C attaches no antiforgery filter to
+      // /api/chat, so flipping that decision later is a one-line server change, not a client one.
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const xsrfToken = readXsrfToken();
+      if (xsrfToken != null) {
+        headers['X-XSRF-TOKEN'] = xsrfToken;
+      }
+
       const response = await fetch(`${environment.apiBaseUrl}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({ question })
       });
+
+      if (response.status === 401) {
+        // A 401 here can only be on the INITIAL request: the HTTP status commits before
+        // streaming begins, so a "mid-stream 401" is not a real condition for this SSE
+        // implementation. Surface it visibly (the assistant message signal, same mechanism
+        // Upload uses for its own lastMessage) and redirect through the same AuthService the
+        // guard uses, instead of letting this become an unhandled rejection.
+        this.patchAssistantMessage(assistantIndex, (message) => ({
+          ...message,
+          text: 'Your session has expired. Redirecting to sign in…',
+          streaming: false
+        }));
+        this.authService.redirectToLogin();
+        return;
+      }
 
       if (!response.ok || !response.body) {
         throw new Error(`Chat request failed with status ${response.status}`);
