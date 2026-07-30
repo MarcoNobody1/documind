@@ -52,6 +52,7 @@ flowchart LR
 | --- | --- |
 | Frontend | Angular (standalone components, SCSS, SSE streaming chat) |
 | Backend | ASP.NET Core on .NET 10 (C# 14), Clean Architecture |
+| Auth | ASP.NET Core Identity (schema only so far — see Key decisions) |
 | AI | Azure OpenAI via Microsoft.Extensions.AI abstractions |
 | Vector store | PostgreSQL + pgvector |
 | Dev environment | Docker Compose |
@@ -69,6 +70,7 @@ flowchart LR
 - **The API base URL is an Angular environment, not a hardcoded constant** — `ChatService` reads `environment.apiBaseUrl`. The `development` build configuration's `fileReplacements` swaps in `environment.development.ts` (`http://localhost:5092`, the API's local port); the default `environment.ts` used by production ships `''` on purpose — an empty base means every request resolves against the page's own origin, which is correct once the API is reachable at the same origin as the client or through a reverse proxy, and is not a placeholder someone forgot to fill in.
 - **No credential literal in tracked configuration** — `appsettings.json` carries only non-secret deployment topology (the model deployment names); the Azure OpenAI endpoint and key, and the Postgres connection string, come from `dotnet user-secrets`, which stores them outside the working tree. The Compose stack reads its Postgres credentials from an untracked `.env`, declared *without* fallback defaults on purpose: a default in `docker-compose.yml` would still be a tracked credential, so it would move the value four characters to the right and fix nothing. Missing configuration fails loudly on both halves — Compose refuses to interpolate, and the API throws at startup with the exact command to run. `.gitignore` covers credential-shaped filenames as a safety net, not as the mechanism.
 - **Hosting: Azure App Service + Neon** — managed app hosting plus serverless Postgres keeps the demo cheap to run and simple to deploy.
+- **Identity's schema lands before any endpoint (Phase 2, PR1 of 5)** — `DocuMindDbContext` now also inherits `IdentityUserContext<ApplicationUser, Guid>`, and a migration creates the `AspNetUsers`/`AspNetUserClaims`/`AspNetUserLogins`/`AspNetUserTokens` tables. Nothing reads or writes them yet: no auth endpoint exists, no authentication/authorization middleware is registered, and no route requires it. This PR is deliberately inert — `main` stays functionally identical to before this dependency was added — so the schema change can be reviewed and merged on its own before the endpoints, cookie/XSRF transport, and per-user document ownership that depend on it land in later PRs. `ApplicationUser` lives in Infrastructure, not Domain: it derives from an Identity framework type, which makes it a persistence concern, and Domain never consumes it — ownership will be a bare `Guid` on the entity and the foreign key is configured in the DbContext. That is deliberately unlike the `Pgvector` reference in Domain above, which is forced rather than chosen: EF Core can only translate `CosineDistance` into SQL when the entity property is itself typed as a vector.
 
 ## Getting started
 
