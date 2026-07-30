@@ -1,0 +1,35 @@
+<section class="auth">
+  <h2>Register</h2>
+
+  <form (submit)="$event.preventDefault(); submit()">
+    <label>
+      Email
+      <input
+        type="email"
+        [value]="email()"
+        (input)="onEmailInput($event)"
+        [disabled]="isSubmitting()"
+        required
+      />
+    </label>
+
+    <label>
+      Password
+      <input
+        type="password"
+        [value]="password()"
+        (input)="onPasswordInput($event)"
+        [disabled]="isSubmitting()"
+        required
+      />
+    </label>
+
+    <button type="submit" [disabled]="isSubmitting()">Register</button>
+  </form>
+
+  @if (lastMessage()) {
+    <p class="warning">{{ lastMessage() }}</p>
+  }
+
+  <p>Already have an account? <a routerLink="/login">Log in</a></p>
+</section>
