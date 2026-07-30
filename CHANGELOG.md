@@ -12,6 +12,8 @@ explains the project to a newcomer.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-30
+
 Phase 2 — authentication and per-user documents. **This phase is a breaking change for any
 existing deployment**: documents are no longer a shared collection, and the migration that
 introduces ownership deletes all existing documents and chunks rather than guessing an owner for
@@ -35,6 +37,12 @@ them (see Removed).
 - **Client authentication surface.** `/login` and `/register` routes with a guarded application
   root, and a bootstrap call that resolves the session once per app load before the guard decides
   anything.
+- **Identity behaviour tests.** Duplicate-email rejection, wrong-password rejection, and account
+  lockout are verified against a real database rather than assumed from the framework's
+  documentation. Lockout matters most: the argument that enables it defaults to off, and a login
+  endpoint with lockout disabled is indistinguishable from one with it enabled until someone
+  attacks it. The threshold is measured, and the correct password is confirmed to be refused while
+  an account is locked.
 - **Owner-isolation integration test.** Runs against a real pgvector instance via Testcontainers,
   seeds three users with roughly five thousand chunks each, and asserts both that results belong
   exclusively to the querying owner and that PostgreSQL chose the HNSW index scan. Isolation is a
@@ -114,5 +122,6 @@ came from.
 - Chat is single-turn: there is no conversation history.
 - No authentication. Every uploaded document lives in one shared collection.
 
-[Unreleased]: https://github.com/MarcoNobody1/documind/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/MarcoNobody1/documind/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/MarcoNobody1/documind/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/MarcoNobody1/documind/releases/tag/v0.1.0
