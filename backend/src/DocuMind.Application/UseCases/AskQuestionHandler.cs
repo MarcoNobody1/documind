@@ -7,9 +7,9 @@ namespace DocuMind.Application.UseCases;
 
 /// <summary>
 /// Orchestrates the RAG chat pipeline: embed the question, retrieve the top-k most relevant
-/// chunks across ALL ingested documents, build a grounded prompt, and stream the answer.
-/// Citations are resolved eagerly from the retrieved chunks' stored metadata — never parsed or
-/// inferred from the model's free-text output — while answer tokens are streamed lazily.
+/// chunks owned by the caller, build a grounded prompt, and stream the answer. Citations are
+/// resolved eagerly from the retrieved chunks' stored metadata — never parsed or inferred from the
+/// model's free-text output — while answer tokens are streamed lazily.
 /// </summary>
 public class AskQuestionHandler
 {
@@ -41,10 +41,10 @@ public class AskQuestionHandler
         _topK = topK;
     }
 
-    public async Task<AskAnswer> HandleAsync(string question, CancellationToken cancellationToken = default)
+    public async Task<AskAnswer> HandleAsync(Guid ownerId, string question, CancellationToken cancellationToken = default)
     {
         var queryEmbedding = await _embeddingGenerator.GenerateVectorAsync(question, cancellationToken: cancellationToken);
-        var retrievedChunks = await _chunkRepository.SearchAsync(queryEmbedding, _topK, cancellationToken);
+        var retrievedChunks = await _chunkRepository.SearchAsync(ownerId, queryEmbedding, _topK, cancellationToken);
 
         var citations = retrievedChunks
             .Select(chunk => new Citation(chunk.DocumentName, chunk.PageNumber))
