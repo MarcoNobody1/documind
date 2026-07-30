@@ -13,6 +13,17 @@ public class DocumentChunk
     public Guid DocumentId { get; set; }
 
     /// <summary>
+    /// A denormalized copy of the owning <see cref="Document"/>'s <see cref="Document.OwnerId"/>.
+    /// Kept on the chunk itself — not resolved via a join to <c>documents</c> — so the owner-scoped
+    /// retrieval predicate in <c>EfChunkRepository.SearchAsync</c> is single-table on the same
+    /// relation the HNSW index lives on. Filtering through a join would place the predicate above
+    /// the ordered index scan as a semi-join, which is not a shape pgvector's iterative scan is
+    /// built for. A composite foreign key to <c>documents (Id, OwnerId)</c> makes it structurally
+    /// impossible for this value to disagree with the owning document's.
+    /// </summary>
+    public Guid OwnerId { get; set; }
+
+    /// <summary>
     /// The 1-based page number this chunk was extracted from. Preserved for exact citations.
     /// </summary>
     public int PageNumber { get; set; }

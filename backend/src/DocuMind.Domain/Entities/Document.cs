@@ -7,6 +7,14 @@ public class Document
 {
     public Guid Id { get; set; }
 
+    /// <summary>
+    /// The authenticated user who uploaded this document. Set only from the authenticated
+    /// principal, never from request body input (see <c>ClaimsPrincipalExtensions.GetOwnerId</c>).
+    /// Authoritative: <see cref="DocumentChunk.OwnerId"/> is a derived copy, enforced to agree with
+    /// this value by a composite foreign key, not by discipline.
+    /// </summary>
+    public Guid OwnerId { get; set; }
+
     public string FileName { get; set; } = string.Empty;
 
     public int PageCount { get; set; }
