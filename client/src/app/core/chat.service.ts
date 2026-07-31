@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
-import { ChatMessage, Citation, UploadDocumentResponse } from './models';
+import { ChatMessage, Citation, MessageOutcome, UploadDocumentResponse } from './models';
 import { readXsrfToken } from './xsrf';
 
 /**
@@ -16,6 +16,13 @@ import { readXsrfToken } from './xsrf';
 export class ChatService {
   readonly messages = signal<ChatMessage[]>([]);
   readonly isStreaming = signal(false);
+
+  /**
+   * The controller for the in-flight `ask()` request, if any. `stop()` aborts through it;
+   * `ask()`'s own `finally` clears it (identity-guarded — see `ask()`) so a later request's
+   * controller is never touched by a stale reference.
+   */
+  private controller: AbortController | null = null;
 
   constructor(
     private readonly http: HttpClient,
@@ -48,6 +55,13 @@ export class ChatService {
 
     this.isStreaming.set(true);
 
+    // Local `const` (not just the field) so `finally`'s identity guard can tell "my own request
+    // finished" apart from "a newer request already replaced `this.controller`" — see point 4 in
+    // the class doc above `stop()`.
+    const controller = new AbortController();
+    this.controller = controller;
+    let outcome: MessageOutcome = 'complete';
+
     try {
       // `fetch` bypasses every Angular interceptor, so credentials and the antiforgery header
       // are attached manually here rather than relying on api.interceptor.ts (which only sees
@@ -65,7 +79,8 @@ export class ChatService {
         method: 'POST',
         credentials: 'include',
         headers,
-        body: JSON.stringify({ question })
+        body: JSON.stringify({ question }),
+        signal: controller.signal
       });
 
       if (response.status === 401) {
@@ -74,6 +89,7 @@ export class ChatService {
         // implementation. Surface it visibly (the assistant message signal, same mechanism
         // Upload uses for its own lastMessage) and redirect through the same AuthService the
         // guard uses, instead of letting this become an unhandled rejection.
+        outcome = 'failed';
         this.patchAssistantMessage(assistantIndex, (message) => ({
           ...message,
           text: 'Your session has expired. Redirecting to sign in…',
@@ -101,10 +117,36 @@ export class ChatService {
           }));
         }
       }
+    } catch (error) {
+      // `error.name === 'AbortError'` is not checked here: a rejection surfacing from
+      // `reader.read()` inside `parseSseStream` (rather than from `fetch` itself) is not
+      // guaranteed to carry that name across fetch implementations and jsdom. `signal.aborted`
+      // is the runtime-independent source of truth for "did *we* cause this rejection".
+      if (controller.signal.aborted) {
+        outcome = 'stopped'; // user-initiated via stop() — swallow, this is normal termination.
+      } else {
+        outcome = 'failed';
+        throw error; // a genuine failure — let it propagate as before.
+      }
     } finally {
-      this.patchAssistantMessage(assistantIndex, (message) => ({ ...message, streaming: false }));
+      // Identity guard: only clear the field if it still points at *this* request's controller.
+      // Without it, a slow-finishing request could null out a newer request's controller after
+      // that newer request has already replaced it (see the class-level doc comment).
+      if (this.controller === controller) {
+        this.controller = null;
+      }
+      this.patchAssistantMessage(assistantIndex, (message) => ({
+        ...message,
+        streaming: false,
+        outcome
+      }));
       this.isStreaming.set(false);
     }
+  }
+
+  /** Aborts the in-flight `ask()` request, if any. No-op when idle (`controller` is `null`). */
+  stop(): void {
+    this.controller?.abort();
   }
 
   private patchAssistantMessage(index: number, patch: (message: ChatMessage) => ChatMessage): void {
