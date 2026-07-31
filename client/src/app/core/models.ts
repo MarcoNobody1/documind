@@ -16,6 +16,9 @@ export interface UploadDocumentResponse {
   warning: string | null;
 }
 
+/** Terminal outcome of a streamed assistant turn. Absent while streaming and on every user turn. */
+export type MessageOutcome = 'complete' | 'stopped' | 'failed';
+
 /** A single turn in the (single-turn, no-history) chat UI. */
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -23,4 +26,9 @@ export interface ChatMessage {
   citations?: Citation[];
   /** True while the assistant's answer is still streaming in. */
   streaming?: boolean;
+  /**
+   * Terminal outcome of an assistant turn: set only via `ChatService`'s `patchAssistantMessage`,
+   * never on a user turn and never while `streaming` is true.
+   */
+  outcome?: MessageOutcome;
 }

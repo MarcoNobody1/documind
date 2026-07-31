@@ -17,6 +17,10 @@
             }
           </ul>
         }
+
+        @if (message.outcome === 'stopped') {
+          <p>Stopped — a partial answer has no sources.</p>
+        }
       </div>
     }
   </div>
@@ -32,6 +36,9 @@
     <button type="submit" [disabled]="chatService.isStreaming() || !question().trim()">
       Ask
     </button>
+    @if (chatService.isStreaming()) {
+      <button type="button" (click)="chatService.stop()">Stop</button>
+    }
   </form>
 
   @if (errorMessage()) {
