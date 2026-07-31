@@ -1,0 +1,43 @@
+<div class="flex flex-col gap-4 p-4">
+  <div>
+    <h2 class="text-sm font-semibold">Sources</h2>
+    <p class="text-xs text-muted-foreground">
+      Documents you've uploaded, searchable by every question you ask.
+    </p>
+  </div>
+
+  <app-upload-control
+    [isUploading]="isUploading()"
+    [message]="uploadMessage()"
+    [messageIsWarning]="uploadMessageIsWarning()"
+    (fileSelected)="onFileSelected($event)"
+  />
+
+  <hlm-separator />
+</div>
+
+<div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+  @if (documentsService.isLoading()) {
+    <div class="flex flex-col gap-2">
+      <div hlmSkeleton class="h-14 w-full"></div>
+      <div hlmSkeleton class="h-14 w-full"></div>
+      <div hlmSkeleton class="h-14 w-full"></div>
+    </div>
+  } @else if (documentsService.loadFailed()) {
+    <div hlmCard size="sm" class="text-sm text-destructive">
+      Couldn't load your documents. Try again shortly.
+    </div>
+  } @else if (documentsService.documents().length === 0) {
+    <div hlmCard size="sm" class="text-sm text-muted-foreground">
+      No documents yet — upload a PDF above to start asking questions about it.
+    </div>
+  } @else {
+    <ul class="flex flex-col gap-2">
+      @for (document of documentsService.documents(); track document.id) {
+        <li>
+          <app-document-card [document]="document" />
+        </li>
+      }
+    </ul>
+  }
+</div>

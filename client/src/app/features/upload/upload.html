@@ -1,19 +1,21 @@
-<section class="upload">
-  <h2>Upload a document</h2>
-  <p>Add a PDF to the shared knowledge base. It becomes searchable by every question below.</p>
+<div>
+  <label class="text-sm font-medium" for="upload-file-input">Upload a document</label>
+  <p class="text-xs text-muted-foreground">Add a PDF. It becomes searchable by every question below.</p>
+</div>
 
-  <input
-    type="file"
-    accept="application/pdf"
-    [disabled]="isUploading()"
-    (change)="onFileSelected($event)"
-  />
+<input
+  id="upload-file-input"
+  type="file"
+  accept="application/pdf"
+  class="text-sm"
+  [disabled]="isUploading()"
+  (change)="onFileSelected($event)"
+/>
 
-  @if (isUploading()) {
-    <p>Uploading&hellip;</p>
-  }
+@if (isUploading()) {
+  <p class="text-sm text-muted-foreground">Uploading&hellip;</p>
+}
 
-  @if (lastMessage()) {
-    <p [class.warning]="lastMessageIsWarning()">{{ lastMessage() }}</p>
-  }
-</section>
+@if (message()) {
+  <p class="text-sm" [class.text-destructive]="messageIsWarning()">{{ message() }}</p>
+}

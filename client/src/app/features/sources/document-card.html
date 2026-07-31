@@ -1,0 +1,7 @@
+<div hlmCard size="sm" class="gap-1">
+  <p class="truncate text-sm font-medium" [title]="document().fileName">{{ document().fileName }}</p>
+  <p class="text-xs text-muted-foreground">
+    {{ document().pageCount }} page{{ document().pageCount === 1 ? '' : 's' }} · uploaded
+    {{ document().uploadedAtUtc | date: 'mediumDate' }}
+  </p>
+</div>

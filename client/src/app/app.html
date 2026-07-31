@@ -1,9 +1,11 @@
 <!--
-  Deliberately minimal/throwaway UI (see portfolio/documind-ui-future). Functional, not styled —
-  a dedicated design slice follows Slice B.
+  `<main>` is a full-viewport flex column, not the old centred `max-w-[640px]` box: `AppShell`
+  (slice 3) needs the entire viewport for its two-pane layout, and a shared `<main>` wraps every
+  route. `/login` and `/register` carry no Tailwind classes of their own yet (PR5 restyles them),
+  so losing the centring here costs nothing they were relying on.
 -->
-<main class="mx-auto max-w-[640px] p-6 font-sans">
-  <header>
+<main class="flex h-dvh flex-col font-sans">
+  <header class="shrink-0 p-6">
     <h1>DocuMind</h1>
     <p>Chat with your documents — every answer cites the page it came from.</p>
   </header>
