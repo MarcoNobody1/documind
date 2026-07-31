@@ -1,6 +1,7 @@
 import { Component, signal } from '@angular/core';
 
 import { ChatService } from '../../core/chat.service';
+import { uploadErrorMessage } from '../../core/upload-error';
 
 /**
  * PDF upload UI. Deliberately minimal/throwaway (see portfolio/documind-ui-future) — a dedicated
@@ -39,9 +40,9 @@ export class Upload {
           `Uploaded "${file.name}": ${result.pageCount} page(s), ${result.chunkCount} chunk(s).`
         );
       }
-    } catch {
+    } catch (error) {
       this.lastMessageIsWarning.set(true);
-      this.lastMessage.set(`Failed to upload "${file.name}". Is the API running?`);
+      this.lastMessage.set(uploadErrorMessage(error, file.name));
     } finally {
       this.isUploading.set(false);
       input.value = '';
