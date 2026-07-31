@@ -82,3 +82,19 @@
 @utility animate-blink {
   animation: blink 1s step-start infinite;
 }
+
+/* The dark theme's tokens are defined above, but CSS variables paint nothing on their own — some
+   element has to consume them. Without this rule `<html class="dark">` (set in index.html) was
+   inert: the page rendered black-on-white while claiming to be in dark mode, which fails the
+   spec's "the dark visual theme is applied" scenario rather than merely looking unfinished.
+   Caught by measuring the rendered page, not by reading the code.
+
+   `body` rather than a component: this is a document-level concern, and putting it on a route
+   component would leave every other route unthemed. It is the one exception ADR-L's
+   "utilities in templates" policy needs, and it lives in the single global stylesheet ADR-L
+   already sanctions for tokens, keyframes and utilities. */
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+  }
+}
