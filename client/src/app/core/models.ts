@@ -19,6 +19,19 @@ export interface UploadDocumentResponse {
 /** Terminal outcome of a streamed assistant turn. Absent while streaming and on every user turn. */
 export type MessageOutcome = 'complete' | 'stopped' | 'failed';
 
+/**
+ * A document owned by the caller, as listed by `GET /api/documents`. Mirrors the backend's
+ * `DocumentListItem(Guid Id, string FileName, int PageCount, DateTime UploadedAtUtc)` exactly —
+ * no chunk count, no owner: the endpoint deliberately excludes both (see `documind/ui-redesign-scope`).
+ */
+export interface DocumentListItem {
+  id: string;
+  fileName: string;
+  pageCount: number;
+  /** ISO 8601 — `DateTime` serialises this way. Format with `DatePipe` in the template. */
+  uploadedAtUtc: string;
+}
+
 /** A single turn in the (single-turn, no-history) chat UI. */
 export interface ChatMessage {
   role: 'user' | 'assistant';
