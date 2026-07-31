@@ -1,2 +1,27 @@
-<app-upload />
-<app-chat />
+@if (isDesktop()) {
+  <aside class="flex w-72 shrink-0 flex-col border-r border-border">
+    <app-sources-panel />
+  </aside>
+
+  <app-chat class="min-h-0 flex-1" />
+} @else {
+  <header class="flex items-center gap-2 border-b border-border p-2">
+    <button type="button" hlmBtn variant="outline" size="icon" (click)="drawerOpen.set(true)">
+      <span class="sr-only">Open sources</span>
+      &#9776;
+    </button>
+    <h2 class="text-sm font-medium">DocuMind</h2>
+  </header>
+
+  <hlm-sheet
+    side="left"
+    [state]="drawerOpen() ? 'open' : 'closed'"
+    (stateChanged)="drawerOpen.set($event === 'open')"
+  >
+    <hlm-sheet-content *brnSheetContent="let ctx" class="w-72 p-0">
+      <app-sources-panel />
+    </hlm-sheet-content>
+  </hlm-sheet>
+
+  <app-chat class="min-h-0 flex-1" />
+}

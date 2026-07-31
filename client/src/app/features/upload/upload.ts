@@ -1,51 +1,32 @@
-import { Component, signal } from '@angular/core';
-
-import { ChatService } from '../../core/chat.service';
-import { uploadErrorMessage } from '../../core/upload-error';
+import { Component, input, output } from '@angular/core';
 
 /**
- * PDF upload UI. Deliberately minimal/throwaway (see portfolio/documind-ui-future) — a dedicated
- * design slice follows.
+ * Presentational PDF upload control, living inside the sources panel (#1988 §3). Emits the
+ * selected file and lets its container (`SourcesPanel`) own the upload call and the
+ * upload-in-progress/result state, so the container can refresh the document list on success
+ * (ADR-P). No service injection here — that is the leaf rule the whole redesign holds to.
  */
 @Component({
-  selector: 'app-upload',
-  templateUrl: './upload.html'
+  selector: 'app-upload-control',
+  templateUrl: './upload.html',
+  host: { class: 'flex flex-col gap-2' }
 })
-export class Upload {
-  readonly isUploading = signal(false);
-  readonly lastMessage = signal<string | null>(null);
-  readonly lastMessageIsWarning = signal(false);
+export class UploadControl {
+  readonly isUploading = input.required<boolean>();
+  readonly message = input<string | null>(null);
+  readonly messageIsWarning = input(false);
 
-  constructor(private readonly chatService: ChatService) {}
+  readonly fileSelected = output<File>();
 
-  async onFileSelected(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+  onFileSelected(event: Event): void {
+    const fileInput = event.target as HTMLInputElement;
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+
     if (!file) {
       return;
     }
 
-    this.isUploading.set(true);
-    this.lastMessage.set(null);
-
-    try {
-      const result = await this.chatService.uploadDocument(file);
-
-      if (result.warning) {
-        this.lastMessageIsWarning.set(true);
-        this.lastMessage.set(result.warning);
-      } else {
-        this.lastMessageIsWarning.set(false);
-        this.lastMessage.set(
-          `Uploaded "${file.name}": ${result.pageCount} page(s), ${result.chunkCount} chunk(s).`
-        );
-      }
-    } catch (error) {
-      this.lastMessageIsWarning.set(true);
-      this.lastMessage.set(uploadErrorMessage(error, file.name));
-    } finally {
-      this.isUploading.set(false);
-      input.value = '';
-    }
+    this.fileSelected.emit(file);
   }
 }
