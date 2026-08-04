@@ -1,16 +1,23 @@
 import { Component, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmInputImports } from '@spartan-ng/helm/input';
+import { HlmLabelImports } from '@spartan-ng/helm/label';
 
 import { AuthService } from '../../../core/auth.service';
 
 /**
- * Registration UI. Deliberately minimal/throwaway (see portfolio/documind-ui-future), matching
- * the existing unstyled convention — a dedicated design slice follows.
+ * Registration UI, restyled on the Helm primitives already in the repo (card, button) plus the
+ * two pulled by this slice (input, label). Host declares `flex flex-1 items-center justify-center
+ * p-6` per ADR-L: the shared `<main>` (PR3) is a full-viewport flex column with no centring of
+ * its own, so the auth screens own their own centring rather than inheriting one.
  */
 @Component({
   selector: 'app-register',
-  imports: [RouterLink],
-  templateUrl: './register.html'
+  imports: [RouterLink, ...HlmCardImports, ...HlmButtonImports, ...HlmInputImports, ...HlmLabelImports],
+  templateUrl: './register.html',
+  host: { class: 'flex flex-1 items-center justify-center p-6' }
 })
 export class Register {
   readonly email = signal('');
