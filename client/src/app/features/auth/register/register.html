@@ -40,7 +40,10 @@
     </form>
   </div>
 
-  <div hlmCardFooter class="justify-center text-sm text-muted-foreground">
+  <!-- `gap-1.5` rather than relying on the newline below: hlmCardFooter is `flex items-center`, and
+       whitespace between flex items collapses to nothing, so the sentence and the link would
+       otherwise render touching. -->
+  <div hlmCardFooter class="justify-center gap-1.5 text-sm text-muted-foreground">
     Already have an account?
     <a routerLink="/login" class="text-primary underline-offset-4 hover:underline">Log in</a>
   </div>
